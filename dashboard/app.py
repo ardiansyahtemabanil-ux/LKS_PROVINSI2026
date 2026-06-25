@@ -26,7 +26,7 @@ HTML_TEMPLATE = """
         
         {% if alerts %}
         <div class="alert alert-danger" role="alert">
-            <h4 class="alert-heading">⚠️ Deteksi Fraud Baru!</h4>
+            <h4 class="alert-heading"> Deteksi Fraud Baru!</h4>
             <ul>
             {% for alert in alerts %}
                 <li>{{ alert }}</li>
