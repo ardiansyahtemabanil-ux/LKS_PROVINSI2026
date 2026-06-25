@@ -74,35 +74,19 @@ def index():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    try:
-        # Mengambil data mentah karena SNS mengirimkan data dalam format text/plain
-        raw_data = request.data.decode('utf-8')
-        data = json.loads(raw_data)
-        
-        # Logika krusial untuk otomatis menyetujui handshake/konfirmasi Amazon SNS
-        if request.headers.get('X-Amz-Sns-Message-Type') == 'SubscriptionConfirmation':
-            subscribe_url = data.get('SubscribeURL')
-            if subscribe_url:
-                # Lakukan HTTP GET ke SubscribeURL agar status langsung otomatis 'Confirmed'
-                import urllib.request
-                urllib.request.urlopen(subscribe_url)
-                print("SUCCESS: SNS Subscription Confirmed!")
-                return jsonify({"status": "confirmed"}), 200
 
-        # Logika menangani pesan fraud dari Lambda
-        if 'Message' in data:
-            try:
-                msg = json.loads(data['Message'])
-            except Exception:
-                msg = {"transaction_id": "Unknown", "location": "Unknown"}
-                
-            fraud_alerts.append(f"Transaksi {msg.get('transaction_id')} terindikasi Fraud di lokasi {msg.get('location', 'Unknown')}")
-            
-        return jsonify({"status": "success"}), 200
+    data = json.loads(request.data)
+    
+    
+    if request.headers.get('X-Amz-Sns-Message-Type') == 'SubscriptionConfirmation':
+        return jsonify({"status": "subscribed"}), 200
         
-    except Exception as e:
-        print(f"Error pada webhook: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+    if 'Message' in data:
+        msg = json.loads(data['Message'])
+        fraud_alerts.append(f"Transaksi {msg.get('transaction_id')} terindikasi Fraud di lokasi {msg.get('location', 'Unknown')}")
+        
+    return jsonify({"status": "success"}), 200
+
 @app.route('/report')
 def report():
     
