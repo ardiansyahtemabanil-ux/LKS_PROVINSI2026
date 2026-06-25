@@ -1,0 +1,53 @@
+name: Deploy SistemToko Dashboard
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Lint check
+        run: |
+          pip install flake8
+          # Melakukan syntax check/linting dasar pada folder dashboard
+          flake8 dashboard/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Build Docker image
+        run: |
+          # Menggunakan github.repository_owner dengan env lowercase untuk standarisasi nama namespace GHCR
+          IMAGE_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/$IMAGE_OWNER/sistemtoko-dashboard:latest dashboard/
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push image
+        run: |
+          IMAGE_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          docker push ghcr.io/$IMAGE_OWNER/sistemtoko-dashboard:latest
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            IMAGE_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            # Login ke GHCR di dalam server EC2
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Pull & deploy container baru
+            docker pull ghcr.io/$IMAGE_OWNER/sistemtoko-dashboard:latest
+            docker stop sistemtoko-dashboard || true
+            docker rm sistemtoko-dashboard || true
+            docker run -d --name sistemtoko-dashboard -p 8080:8080 ghcr.io/$IMAGE_OWNER/sistemtoko-dashboard:latest
